@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Veridia - O Rio dos Encantos</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .game-container { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .game-hud { display: flex; justify-content: space-between; width: 100%; max-width: 480px; background: #0f172a; padding: 8px 12px; border-radius: 8px; border: 1px solid #1e293b; font-size: 13px; font-weight: bold; }
+    .mobile-controls { display: grid; grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(2, 50px); gap: 8px; justify-content: center; margin-top: 5px; }
+    .btn-move { background: #1e293b; color: #34d399; border: 1px solid #334155; font-size: 18px; font-weight: bold; border-radius: 8px; display: flex; justify-content: center; align-items: center; cursor: pointer; user-select: none; touch-action: manipulation; }
+    .btn-move:active { background: #10b981; color: #000; }
+    .btn-up { grid-column: 2; grid-row: 1; }
+    .btn-left { grid-column: 1; grid-row: 2; }
+    .btn-down { grid-column: 2; grid-row: 2; }
+    .btn-right { grid-column: 3; grid-row: 2; }
+  </style>
+</head>
+<body class="game-body">
+
+  <div class="game-container">
+    <header class="page-header">
+      <a href="index.html" class="btn-back">◄ Voltar ao Portal</a>
+      <h2>🌊 Rio dos Encantos - Veridia</h2>
+    </header>
+
+    <!-- HUD de Informações e Pontuação -->
+    <div class="game-hud">
+      <span id="hudName" style="color: #34d399;">Guardião: A carregar...</span>
+      <span style="color: #f59e0b;">✨ Cristais: <strong id="hudScore">0</strong></span>
+    </div>
+
+    <!-- Canvas do Jogo -->
+    <canvas id="gameCanvas" width="480" height="300"></canvas>
+
+    <!-- Botões de Movimento Tátil -->
+    <div class="mobile-controls">
+      <button class="btn-move btn-up" id="btnUp">▲</button>
+      <button class="btn-move btn-left" id="btnLeft">◄</button>
+      <button class="btn-move btn-down" id="btnDown">▼</button>
+      <button class="btn-move btn-right" id="btnRight">►</button>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('load', () => {
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+
+      // 1. Recuperar o último jogador guardado no CRUD
+      let savedPlayers = [];
+      try {
+        savedPlayers = JSON.parse(localStorage.getItem('veridia_players_db')) || [];
+      } catch (e) {
+        savedPlayers = [];
+      }
+
+      const activePlayer = savedPlayers.length > 0 
+        ? savedPlayers[savedPlayers.length - 1] 
+        : { name: 'Kaelen da Aurora', classType: 'Aurora', level: 3 };
+
+      document.getElementById('hudName').innerText = `${activePlayer.name} (Lvl ${activePlayer.level})`;
+
+      // Atributos dinâmicos baseados no nível criado no CRUD
+      let player = {
+        x: 80,
+        y: canvas.height / 2,
+        radius: 11 + Math.min(activePlayer.level, 4),
+        speed: 2.2 + (activePlayer.level * 0.1), // Nível maior = maior velocidade
+        name: activePlayer.name,
+        score: 0
+      };
+
+      // Itens colecionáveis (Cristais de Luz)
+      let crystals = [
+        { x: 130, y: 60, collected: false },
+        { x: 370, y: 70, collected: false },
+        { x: 110, y: 240, collected: false },
+        { x: 390, y: 230, collected: false },
+        { x: 270, y: 140, collected: false }
+      ];
+
+      // Controlos
+      const keys = { up: false, down: false, left: false, right: false };
+
+      window.addEventListener('keydown', (e) => {
+        const k = e.key.toLowerCase();
+        if (k === 'arrowup' || k === 'w') keys.up = true;
+        if (k === 'arrowdown' || k === 's') keys.down = true;
+        if (k === 'arrowleft' || k === 'a') keys.left = true;
+        if (k === 'arrowright' || k === 'd') keys.right = true;
+      });
+
+      window.addEventListener('keyup', (e) => {
+        const k = e.key.toLowerCase();
+        if (k === 'arrowup' || k === 'w') keys.up = false;
+        if (k === 'arrowdown' || k === 's') keys.down = false;
+        if (k === 'arrowleft' || k === 'a') keys.left = false;
+        if (k === 'arrowright' || k === 'd') keys.right = false;
+      });
+
+      function bindTouch(id, direction) {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        const start = (e) => { e.preventDefault(); keys[direction] = true; };
+        const end = (e) => { e.preventDefault(); keys[direction] = false; };
+        btn.addEventListener('touchstart', start, { passive: false });
+        btn.addEventListener('touchend', end, { passive: false });
+        btn.addEventListener('mousedown', start);
+        btn.addEventListener('mouseup', end);
+      }
+
+      bindTouch('btnUp', 'up');
+      bindTouch('btnDown', 'down');
+      bindTouch('btnLeft', 'left');
+      bindTouch('btnRight', 'right');
+
+      let time = 0;
+      const trees = [
+        { x: 50, y: 50, r: 20 }, 
+        { x: 430, y: 60, r: 24 }, 
+        { x: 60, y: 250, r: 22 },
+        { x: 420, y: 260, r: 22 }
+      ];
+      const rocks = [
+        { x: 150, y: 90, r: 13 }, 
+        { x: 350, y: 200, r: 15 }
+      ];
+      
+      const fireflies = Array.from({ length: 15 }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        speed: 0.2 + Math.random() * 0.3
+      }));
+
+      function update() {
+        if (keys.up) player.y -= player.speed;
+        if (keys.down) player.y += player.speed;
+        if (keys.left) player.x -= player.speed;
+        if (keys.right) player.x += player.speed;
+
+        // Limites da tela
+        player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
+        player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
+
+        // Colisão com pedras
+        rocks.forEach(rock => {
+          const dx = player.x - rock.x;
+          const dy = player.y - rock.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < player.radius + rock.r) {
+            const angle = Math.atan2(dy, dx);
+            player.x = rock.x + Math.cos(angle) * (player.radius + rock.r);
+            player.y = rock.y + Math.sin(angle) * (player.radius + rock.r);
+          }
+        });
+
+        // Coleta de Cristais
+        crystals.forEach(c => {
+          if (!c.collected) {
+            const dx = player.x - c.x;
+            const dy = player.y - c.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < player.radius + 10) {
+              c.collected = true;
+              player.score += 10;
+              document.getElementById('hudScore').innerText = player.score;
+            }
+          }
+        });
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Fundo (Relva de Veridia)
+        ctx.fillStyle = '#0a120b';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Rio dos Encantos Animado
+        ctx.fillStyle = '#0284c7';
+        ctx.beginPath();
+        ctx.moveTo(220, 0);
+        ctx.bezierCurveTo(250 + Math.sin(time * 0.05) * 8, 100, 200 + Math.cos(time * 0.05) * 8, 200, 260, 300);
+        ctx.lineTo(310, 300);
+        ctx.bezierCurveTo(250 + Math.cos(time * 0.05) * 8, 200, 300 + Math.sin(time * 0.05) * 8, 100, 270, 0);
+        ctx.fill();
+
+        // Cristais de Luz no mapa
+        crystals.forEach(c => {
+          if (!c.collected) {
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.arc(c.x, c.y + Math.sin(time * 0.1) * 3, 5.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+        });
+
+        // Pedras
+        rocks.forEach(r => {
+          ctx.fillStyle = '#334155';
+          ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2); ctx.fill();
+        });
+
+        // Árvores
+        trees.forEach(t => {
+          ctx.fillStyle = '#064e3b';
+          ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#10b981';
+          ctx.beginPath(); ctx.arc(t.x - 3, t.y - 3, t.r * 0.6, 0, Math.PI * 2); ctx.fill();
+        });
+
+        // Vaga-lumes
+        fireflies.forEach(f => {
+          f.y -= f.speed;
+          if (f.y < 0) f.y = canvas.height;
+          ctx.fillStyle = 'rgba(251, 191, 36, 0.8)';
+          ctx.beginPath();
+          ctx.arc(f.x + Math.sin(time * 0.03) * 2, f.y, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        // Jogador (com brilho)
+        ctx.shadowColor = '#10b981';
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = '#10b981';
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Nome do Jogador no cenário
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText(player.name, player.x, player.y - (player.radius + 6));
+      }
+
+      function loop() {
+        time++;
+        update();
+        draw();
+        requestAnimationFrame(loop);
+      }
+
+      loop();
+    });
+  </script>
+</body>
+</html>

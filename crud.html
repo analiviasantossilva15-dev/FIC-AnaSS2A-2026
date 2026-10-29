@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Veridia - Registo de Guardiões</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="container">
+    <header class="page-header">
+      <a href="index.html" class="btn-back">◄ Voltar ao Portal</a>
+      <h2>🛡️ Registos dos Guardiões da Aurora</h2>
+    </header>
+
+    <form id="playerForm" class="form-box">
+      <input type="hidden" id="playerId">
+      <input type="text" id="playerName" placeholder="Nome do Guardião" required>
+      <select id="playerClass">
+        <option value="Guardião da Aurora">Guardião da Aurora</option>
+        <option value="Mago Místico">Mago Místico</option>
+        <option value="Caçador das Brumas">Caçador das Brumas</option>
+      </select>
+      <input type="number" id="playerLevel" placeholder="Nível / Poder" min="1" value="3" required>
+      <button type="submit" id="btnSave">Salvar / Consagrar Guardião</button>
+    </form>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Guardião</th>
+            <th>Ordem</th>
+            <th>Nível</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="playerTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'veridia_players_db';
+
+    function getPlayers() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [
+          { id: '1', name: 'Kaelen da Aurora', classType: 'Guardião da Aurora', level: 5 }
+        ];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function savePlayers(data) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function renderTable() {
+      const players = getPlayers();
+      const tableBody = document.getElementById('playerTableBody');
+      if (!tableBody) return;
+      
+      tableBody.innerHTML = '';
+      
+      if (players.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum guardião registado em Veridia.</td></tr>';
+        return;
+      }
+
+      players.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${p.name}</strong></td>
+          <td>${p.classType}</td>
+          <td>Lvl ${p.level}</td>
+          <td>
+            <button class="btn-action edit" onclick="editPlayer('${p.id}')">Editar</button>
+            <button class="btn-action delete" onclick="deletePlayer('${p.id}')">Apagar</button>
+          </td>
+        `;
+        tableBody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('playerForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const id = document.getElementById('playerId').value;
+      const name = document.getElementById('playerName').value;
+      const classType = document.getElementById('playerClass').value;
+      const level = Number(document.getElementById('playerLevel').value);
+
+      let players = getPlayers();
+
+      if (id) {
+        const index = players.findIndex(p => p.id === id);
+        if (index !== -1) {
+          players[index] = { id, name, classType, level };
+        }
+      } else {
+        players.push({ id: Date.now().toString(), name, classType, level });
+      }
+
+      savePlayers(players);
+      renderTable();
+      document.getElementById('playerForm').reset();
+      document.getElementById('playerId').value = '';
+    });
+
+    window.editPlayer = function(id) {
+      const players = getPlayers();
+      const player = players.find(p => p.id === id);
+      if (player) {
+        document.getElementById('playerId').value = player.id;
+        document.getElementById('playerName').value = player.name;
+        document.getElementById('playerClass').value = player.classType;
+        document.getElementById('playerLevel').value = player.level;
+      }
+    };
+
+    window.deletePlayer = function(id) {
+      let players = getPlayers();
+      players = players.filter(p => p.id !== id);
+      savePlayers(players);
+      renderTable();
+    }
+
+    window.addEventListener('load', renderTable);
+  </script>
+</body>
+</html>

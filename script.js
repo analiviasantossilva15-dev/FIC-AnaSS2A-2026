@@ -1,7 +1,10 @@
-const STORAGE_KEY = 'rpg_players_db';
+const STORAGE_KEY = 'veridia_players_db';
 
+// Lista inicial com vários personagens do tema de Veridia predefinidos
 let players = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [
-  { id: '1', name: 'Aragorn', classType: 'Guerreiro', level: 10 }
+  { id: '1', name: 'Kaelen da Aurora', classType: 'Guardião da Aurora', level: 12 },
+  { id: '2', name: 'Lyra Sombria', classType: 'Mago Místico', level: 15 },
+  { id: '3', name: 'Boran das Brumas', classType: 'Caçador das Brumas', level: 8 }
 ];
 
 const playerForm = document.getElementById('playerForm');
@@ -16,10 +19,11 @@ function saveToStorage() {
 }
 
 function renderTable() {
+  if (!tableBody) return;
   tableBody.innerHTML = '';
   
   if (players.length === 0) {
-    tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum jogador cadastrado.</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum guardião registado em Veridia.</td></tr>';
     return;
   }
 
@@ -31,36 +35,36 @@ function renderTable() {
       <td>Lvl ${p.level}</td>
       <td>
         <button class="btn-action edit" onclick="editPlayer('${p.id}')">Editar</button>
-        <button class="btn-action delete" onclick="deletePlayer('${p.id}')">Excluir</button>
+        <button class="btn-action delete" onclick="deletePlayer('${p.id}')">Banir</button>
       </td>
     `;
     tableBody.appendChild(tr);
   });
 }
 
-playerForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const id = playerIdInput.value;
-  const name = nameInput.value;
-  const classType = classInput.value;
-  const level = levelInput.value;
+if (playerForm) {
+  playerForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const id = playerIdInput.value;
+    const name = nameInput.value;
+    const classType = classInput.value;
+    const level = levelInput.value;
 
-  if (id) {
-    // Editar existente
-    const index = players.findIndex(p => p.id === id);
-    if (index !== -1) {
-      players[index] = { id, name, classType, level };
+    if (id) {
+      const index = players.findIndex(p => p.id === id);
+      if (index !== -1) {
+        players[index] = { id, name, classType, level };
+      }
+    } else {
+      players.push({ id: Date.now().toString(), name, classType, level });
     }
-  } else {
-    // Criar novo
-    players.push({ id: Date.now().toString(), name, classType, level });
-  }
 
-  saveToStorage();
-  renderTable();
-  playerForm.reset();
-  playerIdInput.value = '';
-});
+    saveToStorage();
+    renderTable();
+    playerForm.reset();
+    playerIdInput.value = '';
+  });
+}
 
 window.editPlayer = function(id) {
   const player = players.find(p => p.id === id);
